@@ -11,7 +11,7 @@ Defaults:
 
 Snapshot every 15 mn, keep 4
 Snapshot every hour, keep 24
-Snapshot every hour, keep 31
+Snapshot every day, keep 31
 Snapshot every week, keep 8
 Snapshot every month, keep 12
 
