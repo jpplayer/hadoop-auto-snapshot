@@ -18,3 +18,9 @@ Snapshot every month, keep 12
 Installation
 
 git clone https://github.com/jpplayer/hdfs-auto-snapshot && cd hdfs-auto-snapshot && make install
+
+Tips
+
+Create Snapshotable directories in HDFS to use this software. For example, to snapshot your entire hadoop cluster: 
+su hdfs -c 'hdfs dfsadmin -allowSnapshot /'
+
