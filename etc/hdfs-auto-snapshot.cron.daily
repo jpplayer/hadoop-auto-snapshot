@@ -1,2 +1,2 @@
 #!/bin/sh
-su hdfs -c 'zfs-auto-snapshot --quiet --syslog --label=daily --keep=31 //'
+su hdfs -c 'hdfs-auto-snapshot --quiet --syslog --label=daily --keep=31 //'
