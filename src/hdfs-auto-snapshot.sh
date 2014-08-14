@@ -1,8 +1,9 @@
 #!/bin/sh
 
-# zfs-auto-snapshot for Linux
-# Automatically create, rotate, and destroy periodic ZFS snapshots.
+# hdfs-auto-snapshot for Linux
+# Automatically create, rotate, and destroy periodic hdfs snapshots.
 # Copyright 2011 Darik Horn <dajhorn@vanadac.com>
+# Copyright 2014 Jean-Philippe Player <jpplayer@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -29,10 +30,10 @@ opt_backup_incremental=''
 opt_default_exclude=''
 opt_dry_run=''
 opt_event='-'
-opt_fast_zfs_list=''
+opt_fast_hdfs_list=''
 opt_keep=''
 opt_label=''
-opt_prefix='zfs-auto-snap'
+opt_prefix='hdfs-auto-snap'
 opt_recursive=''
 opt_sep='_'
 opt_setauto=''
@@ -55,21 +56,17 @@ print_usage ()
   --default-exclude  Exclude datasets if com.sun:auto-snapshot is unset.
   -d, --debug        Print debugging messages.
   -e, --event=EVENT  Set the com.sun:auto-snapshot-desc property to EVENT.
-      --fast         Use a faster zfs list invocation.
+      --fast         Use a faster hdfs list invocation.
   -n, --dry-run      Print actions without actually doing anything.
-  -s, --skip-scrub   Do not snapshot filesystems in scrubbing pools.
   -h, --help         Print this usage message.
   -k, --keep=NUM     Keep NUM recent snapshots and destroy older snapshots.
   -l, --label=LAB    LAB is usually 'hourly', 'daily', or 'monthly'.
-  -p, --prefix=PRE   PRE is 'zfs-auto-snap' by default.
+  -p, --prefix=PRE   PRE is 'hdfs-auto-snap' by default.
   -q, --quiet        Suppress warnings and notices at the console.
-      --send-full=F  Send zfs full backup. Unimplemented.
-      --send-incr=F  Send zfs incremental backup. Unimplemented.
       --sep=CHAR     Use CHAR to separate date stamps in snapshot names.
   -g, --syslog       Write messages into the system log.
-  -r, --recursive    Snapshot named filesystem and all descendants.
   -v, --verbose      Print info messages.
-      name           Filesystem and volume names, or '//' for all ZFS datasets.
+      name           Filesystem and volume names, or '//' for all hdfs datasets.
 " 
 }
 
@@ -139,7 +136,7 @@ do_run () # [argv]
 	return "$RC"
 }
 
-
+#target = dir
 do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 {
 	local PROPS="$1"
@@ -154,9 +151,12 @@ do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 	# global WARNING_COUNT
 	# global SNAPSHOTS_OLD
 
+    # For each hdfs path
 	for ii in $TARGETS
 	do
-		if do_run "zfs snapshot $PROPS $FLAGS '$ii@$NAME'" 
+		#if do_run "hdfs snapshot $PROPS $FLAGS '$ii@$NAME'"
+		# $TARGET must end with a slash 
+		if do_run "hdfs dfs -ls '$ii.snapshot'"
 		then
 			SNAPSHOT_COUNT=$(( $SNAPSHOT_COUNT + 1 ))
 		else
@@ -178,7 +178,7 @@ do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 				KEEP=$(( $KEEP - 1 ))
 				if [ "$KEEP" -le '0' ]
 				then
-					if do_run "zfs destroy $FLAGS '$jj'" 
+					if do_run "hdfs dfs -deleteSnapshot '$ii' '$jj'" 
 					then
 						DESTRUCTION_COUNT=$(( $DESTRUCTION_COUNT + 1 ))
 					else
@@ -229,7 +229,7 @@ do
 			shift 2
 			;;
 		(--fast)
-			opt_fast_zfs_list='1'
+			opt_fast_hdfs_list='1'
 			shift 1
 			;;
 		(-n|--dry-run)
@@ -334,27 +334,22 @@ then
 	exit 134
 fi
 
-# These are the only times that `zpool status` or `zfs list` are invoked, so
-# this program for Linux has a much better runtime complexity than the similar
-# Solaris implementation.
+HDFS_LIST=$(hdfs lsSnapshottableDir  | cut -f 10 -d ' ' ) \
+  || { print_log error "hdfs lsSnapshottableDir  | cut -f 10 -d ' ' $?: $hdfs_LIST"; exit 136; }
 
-ZPOOL_STATUS=$(env LC_ALL=C zpool status 2>&1 ) \
-  || { print_log error "zpool status $?: $ZPOOL_STATUS"; exit 135; }
 
-ZFS_LIST=$(env LC_ALL=C zfs list -H -t filesystem,volume -s name \
-  -o name,com.sun:auto-snapshot,com.sun:auto-snapshot:"$opt_label") \
-  || { print_log error "zfs list $?: $ZFS_LIST"; exit 136; }
+# Not supported in HDFS
+#if [ -n "$opt_fast_hdfs_list" ]
+#then
+#	SNAPSHOTS_OLD=$(env LC_ALL=C hdfs list -H -t snapshot -o name -s name|grep $opt_prefix |awk '{ print substr( $0, length($0) - 14, length($0) ) " " $0}' |sort -r -k1,1 -k2,2|awk '{ print substr( $0, 17, length($0) )}') \
+#	  || { print_log error "hdfs list $?: $SNAPSHOTS_OLD"; exit 137; }
+#else
+#	SNAPSHOTS_OLD=$(env LC_ALL=C hdfs list -H -t snapshot -S creation -o name) \
+#	  || { print_log error "hdfs list $?: $SNAPSHOTS_OLD"; exit 137; }
+#fi
 
-if [ -n "$opt_fast_zfs_list" ]
-then
-	SNAPSHOTS_OLD=$(env LC_ALL=C zfs list -H -t snapshot -o name -s name|grep $opt_prefix |awk '{ print substr( $0, length($0) - 14, length($0) ) " " $0}' |sort -r -k1,1 -k2,2|awk '{ print substr( $0, 17, length($0) )}') \
-	  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
-else
-	SNAPSHOTS_OLD=$(env LC_ALL=C zfs list -H -t snapshot -S creation -o name) \
-	  || { print_log error "zfs list $?: $SNAPSHOTS_OLD"; exit 137; }
-fi
 
-# Verify that each argument is a filesystem or volume.
+# Verify that each argument is an HDFS path.
 for ii in "$@"
 do
 	test "$ii" = '//' && continue 1
@@ -362,40 +357,26 @@ do
 	do
 		test "$ii" = "$NAME" && continue 2
 	done <<-HERE
-	$ZFS_LIST
+	$HDFS_LIST
 	HERE
-	print_log error "$ii is not a ZFS filesystem or volume."
+	print_log error "$ii is not an hdfs path."
 	exit 138
 done
 
-# Get a list of pools that are being scrubbed.
-ZPOOLS_SCRUBBING=$(echo "$ZPOOL_STATUS" | awk -F ': ' \
-  '$1 ~ /^ *pool$/ { pool = $2 } ; \
-   $1 ~ /^ *scan$/ && $2 ~ /scrub in progress/ { print pool }' \
-  | sort ) 
-
-# Get a list of pools that cannot do a snapshot.
-ZPOOLS_NOTREADY=$(echo "$ZPOOL_STATUS" | awk -F ': ' \
-  '$1 ~ /^ *pool$/ { pool = $2 } ; \
-   $1 ~ /^ *state$/ && $2 !~ /ONLINE|DEGRADED/ { print pool } ' \
-  | sort)
-
-# Get a list of datasets for which snapshots are explicitly disabled.
-NOAUTO=$(echo "$ZFS_LIST" | awk -F '\t' \
-  'tolower($2) ~ /false/ || tolower($3) ~ /false/ {print $1}')
-
 # If the --default-exclude flag is set, then exclude all datasets that lack
 # an explicit com.sun:auto-snapshot* property. Otherwise, include them.
-if [ -n "$opt_default_exclude" ]
-then
+#if [ -n "$opt_default_exclude" ]
+#then
 	# Get a list of datasets for which snapshots are explicitly enabled.
-	CANDIDATES=$(echo "$ZFS_LIST" | awk -F '\t' \
-	  'tolower($2) ~ /true/ || tolower($3) ~ /true/ {print $1}')
-else
+#	CANDIDATES=$(echo "$HDFS_LIST" | awk -F '\t' \
+#	  'tolower($2) ~ /true/ || tolower($3) ~ /true/ {print $1}')
+#else
 	# Invert the NOAUTO list.
-	CANDIDATES=$(echo "$ZFS_LIST" | awk -F '\t' \
-	  'tolower($2) !~ /false/ && tolower($3) !~ /false/ {print $1}')
-fi
+#	CANDIDATES=$(echo "$hdfs_LIST" | awk -F '\t' \
+#	  'tolower($2) !~ /false/ && tolower($3) !~ /false/ {print $1}')
+#fi
+
+CANDIDATES="$HDFS_LIST"
 
 # Initialize the list of datasets that will get a recursive snapshot.
 TARGETS_RECURSIVE=''
@@ -423,34 +404,6 @@ do
 	then
 		continue
 	fi
-
-	# Exclude datasets in pools that cannot do a snapshot.
-	for jj in $ZPOOLS_NOTREADY
-	do
-		# Ibid regarding iii.
-		jjj="$jj/"
-
-		# Check whether the pool name is a prefix of the dataset name.
-		if [ "$iii" != "${iii#$jjj}" ]
-		then
-			print_log info "Excluding $ii because pool $jj is not ready."
-			continue 2
-		fi
-	done
-
-	# Exclude datasets in scrubbing pools if the --skip-scrub flag is set.
-	test -n "$opt_skip_scrub" && for jj in $ZPOOLS_SCRUBBING
-	do
-		# Ibid regarding iii.
-		jjj="$jj/"
-
-		# Check whether the pool name is a prefix of the dataset name.
-		if [ "$iii" != "${iii#$jjj}" ]
-		then
-			print_log info "Excluding $ii because pool $jj is scrubbing."
-			continue 2
-		fi
-	done
 
 	for jj in $NOAUTO
 	do
@@ -497,10 +450,6 @@ do
 	print_log debug "Including $ii for recursive snapshot."
 	TARGETS_RECURSIVE="${TARGETS_RECURSIVE:+$TARGETS_RECURSIVE	}$ii" # nb: \t
 done
-
-# Linux lacks SMF and the notion of an FMRI event, but always set this property
-# because the SUNW program does. The dash character is the default.
-SNAPPROP="-o com.sun:auto-snapshot-desc='$opt_event'"
 
 # ISO style date; fifteen characters: YYYY-MM-DD-HHMM
 # On Solaris %H%M expands to 12h34.
