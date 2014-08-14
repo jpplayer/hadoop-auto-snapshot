@@ -6,3 +6,15 @@ the utility that creates the @hdfs-auto-snap_frequent, @hdfs-auto-snap_hourly,
 snapshots if it is installed.
 
 It was originally forked from the zfs-auto-snapshot implementation: https://github.com/zfsonlinux/zfs-auto-snapshot.
+
+Defaults:
+
+Snapshot every 15 mn, keep 4
+Snapshot every hour, keep 24
+Snapshot every hour, keep 31
+Snapshot every week, keep 8
+Snapshot every month, keep 12
+
+Installation
+
+git clone https://github.com/jpplayer/hdfs-auto-snapshot && cd hdfs-auto-snapshot && make install
