@@ -350,10 +350,12 @@ else
         # TODO AND USE FOR OLD SNAPSif do_run "hdfs dfs -ls '$ii.snapshot'"
         SNAPSHOTS_OLD="";
         for path in "$HDFS_LIST"; do
-        SNAPSHOTS_OLD_DIR=$(hdfs dfs -ls "$path.snapshot") \
+        SNAPSHOTS_OLD_DIR=$(hdfs dfs -ls "$path.snapshot" | awk '{ print $8 }' ) \
           || { print_log error "hdfs dfs -ls $path.snapshot  $?: $SNAPSHOTS_OLD"; exit 137; }
         SNAPSHOTS_OLD="$SNAPSHOTS_OLD $SNAPSHOTS_OLD_DIR";
         done
+
+	test -n "$opt_debug" && echo Debug: old snapshots are  $SNAPSHOT_OLD
 fi
 
 # Verify that each argument is an HDFS path.
