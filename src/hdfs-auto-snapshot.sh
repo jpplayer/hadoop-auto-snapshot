@@ -338,16 +338,23 @@ HDFS_LIST=$(hdfs lsSnapshottableDir  | cut -f 10 -d ' ' ) \
   || { print_log error "hdfs lsSnapshottableDir  | cut -f 10 -d ' ' $?: $hdfs_LIST"; exit 136; }
 
 
-# Not supported in HDFS
-#if [ -n "$opt_fast_hdfs_list" ]
-#then
-#	SNAPSHOTS_OLD=$(env LC_ALL=C hdfs list -H -t snapshot -o name -s name|grep $opt_prefix |awk '{ print substr( $0, length($0) - 14, length($0) ) " " $0}' |sort -r -k1,1 -k2,2|awk '{ print substr( $0, 17, length($0) )}') \
-#	  || { print_log error "hdfs list $?: $SNAPSHOTS_OLD"; exit 137; }
-#else
-#	SNAPSHOTS_OLD=$(env LC_ALL=C hdfs list -H -t snapshot -S creation -o name) \
-#	  || { print_log error "hdfs list $?: $SNAPSHOTS_OLD"; exit 137; }
-#fi
 
+
+# For each Snapshottable Directory get list of snapshots. This can be large.
+if [ -n "$opt_fast_hdfs_list" ]
+then
+        SNAPSHOTS_OLD=$(hdfs list -H -t snapshot -o name -s name|grep $opt_prefix |awk '{ print substr( $0, length($0) - 14, length($0) ) " " $0}' |sort -r -k1,1 -k2,2|awk '{ print substr( $0, 17, length($0) )}') \
+          || { print_log error "hdfs list $?: $SNAPSHOTS_OLD"; exit 137; }
+else
+
+        # TODO AND USE FOR OLD SNAPSif do_run "hdfs dfs -ls '$ii.snapshot'"
+        SNAPSHOTS_OLD="";
+        for path in "$HDFS_LIST"; do
+        SNAPSHOTS_OLD_DIR=$(hdfs dfs -ls "$path.snapshot") \
+          || { print_log error "hdfs dfs -ls $path.snapshot  $?: $SNAPSHOTS_OLD"; exit 137; }
+        SNAPSHOTS_OLD="$SNAPSHOTS_OLD $SNAPSHOTS_OLD_DIR";
+        done
+fi
 
 # Verify that each argument is an HDFS path.
 for ii in "$@"
