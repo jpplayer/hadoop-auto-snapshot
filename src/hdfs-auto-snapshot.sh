@@ -53,7 +53,7 @@ SNAPSHOTS_OLD=''
 print_usage ()
 {
 	echo "Usage: $0 [options] [-l label] <'//' | name [name...]>
-  --default-exclude  Exclude datasets if com.sun:auto-snapshot is unset.
+  --default-exclude  Exclude datasets 
   -d, --debug        Print debugging messages.
   -e, --event=EVENT  Set the com.sun:auto-snapshot-desc property to EVENT.
       --fast         Use a faster hdfs list invocation.
