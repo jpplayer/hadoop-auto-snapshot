@@ -151,12 +151,12 @@ do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 	# global WARNING_COUNT
 	# global SNAPSHOTS_OLD
 
-    # For each hdfs path
+        # For each hdfs path
 	for ii in $TARGETS
 	do
 		#if do_run "hdfs snapshot $PROPS $FLAGS '$ii@$NAME'"
-		# $TARGET must end with a slash 
-		if do_run "hdfs dfs -ls '$ii.snapshot'"
+		test -n "$opt_debug" && echo Debug: processing path $ii
+		if do_run "hdfs dfs -createSnapshot '$ii' '$NAME'"
 		then
 			SNAPSHOT_COUNT=$(( $SNAPSHOT_COUNT + 1 ))
 		else
@@ -172,13 +172,17 @@ do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 		# ASSERT: The old snapshot list is sorted by increasing age.
 		for jj in $SNAPSHOTS_OLD
 		do
+			test -n "$opt_debug" && echo Debug: processing old snapshot $jj
 			# Check whether this is an old snapshot of the filesystem.
-			if [ -z "${jj#$ii@$GLOB}" ]
+			#if [ -z "${jj#$ii@$GLOB}" ]
+			if [[ $jj == $ii*  ]]
 			then
+				test -n "$opt_debug" && echo Debug: checking for old snapshot $jj
 				KEEP=$(( $KEEP - 1 ))
 				if [ "$KEEP" -le '0' ]
 				then
-					if do_run "hdfs dfs -deleteSnapshot '$ii' '$jj'" 
+					OLD=$( echo "$jj" | sed 's;.*\.snapshot/;;' )
+					if do_run "hdfs dfs -deleteSnapshot '$ii' '$OLD'" 
 					then
 						DESTRUCTION_COUNT=$(( $DESTRUCTION_COUNT + 1 ))
 					else
@@ -334,10 +338,9 @@ then
 	exit 134
 fi
 
-HDFS_LIST=$(hdfs lsSnapshottableDir  | cut -f 10 -d ' ' ) \
-  || { print_log error "hdfs lsSnapshottableDir  | cut -f 10 -d ' ' $?: $hdfs_LIST"; exit 136; }
-
-
+# Ensure the path ends with a slash
+HDFS_LIST=$(hdfs lsSnapshottableDir  | cut -f 10 -d ' ' | sed 's;[^/]$;\0/;' ) \
+  || { print_log error "hdfs lsSnapshottableDir  | cut -f 10 -d ' ' | sed 's;[^/]$;\0/;' $?: $HDFS_LIST"; exit 136; }
 
 
 # For each Snapshottable Directory get list of snapshots. This can be large.
@@ -347,15 +350,18 @@ then
           || { print_log error "hdfs list $?: $SNAPSHOTS_OLD"; exit 137; }
 else
 
-        # TODO AND USE FOR OLD SNAPSif do_run "hdfs dfs -ls '$ii.snapshot'"
+        # Assert: snpashots listed with newest first
         SNAPSHOTS_OLD="";
-        for path in "$HDFS_LIST"; do
-        SNAPSHOTS_OLD_DIR=$(hdfs dfs -ls "$path.snapshot" | awk '{ print $8 }' ) \
-          || { print_log error "hdfs dfs -ls $path.snapshot  $?: $SNAPSHOTS_OLD"; exit 137; }
-        SNAPSHOTS_OLD="$SNAPSHOTS_OLD $SNAPSHOTS_OLD_DIR";
+        for path in $HDFS_LIST; do
+
+echo processing $path
+        SNAPSHOTS_OLD_DIR=$(hdfs dfs -ls "$path.snapshot" | sort -rk6,6 -rk7,7 | awk '{ print $8 }' ) \
+          || { print_log error "hdfs dfs -ls "$path.snapshot" | sort -rk6,6 -rk7,7 | awk '{ print $8 }'  $?: $SNAPSHOTS_OLD_DIR"; exit 137; }
+	test -n "$opt_debug" && echo Snapshots old dir is $SNAPSHOTS_OLD_DIR. snapshots old is $SNAPSHOTS_OLD.
+	SNAPSHOTS_OLD="$SNAPSHOTS_OLD  $SNAPSHOTS_OLD_DIR"
         done
 
-	test -n "$opt_debug" && echo Debug: old snapshots are  $SNAPSHOT_OLD
+	test -n "$opt_debug" && echo Debug: old snapshots are  "$SNAPSHOTS_OLD"
 fi
 
 # Verify that each argument is an HDFS path.
