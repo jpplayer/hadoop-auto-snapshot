@@ -1,2 +1,2 @@
 #!/bin/sh
-exec zfs-auto-snapshot --quiet --syslog --label=monthly --keep=12 //
+su hdfs -c 'zfs-auto-snapshot --quiet --syslog --label=monthly --keep=12 //'
