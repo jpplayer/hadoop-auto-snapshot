@@ -172,10 +172,10 @@ do_snapshots () # properties, flags, snapname, oldglob, [targets...]
 		# ASSERT: The old snapshot list is sorted by increasing age.
 		for jj in $SNAPSHOTS_OLD
 		do
-			test -n "$opt_debug" && echo Debug: processing old snapshot $jj
+			#test -n "$opt_debug" && echo Debug: processing old snapshot $jj
 			# Check whether this is an old snapshot of the filesystem.
 			#if [ -z "${jj#$ii@$GLOB}" ]
-			if [[ $jj == $ii*  ]]
+			if [ -z "${jj#$ii.snapshot/$GLOB}" ]
 			then
 				test -n "$opt_debug" && echo Debug: checking for old snapshot $jj
 				KEEP=$(( $KEEP - 1 ))
@@ -358,7 +358,7 @@ echo processing $path
         SNAPSHOTS_OLD_DIR=$(hdfs dfs -ls "$path.snapshot" | sort -rk6,6 -rk7,7 | awk '{ print $8 }' ) \
           || { print_log error "hdfs dfs -ls "$path.snapshot" | sort -rk6,6 -rk7,7 | awk '{ print $8 }'  $?: $SNAPSHOTS_OLD_DIR"; exit 137; }
 	test -n "$opt_debug" && echo Snapshots old dir is $SNAPSHOTS_OLD_DIR. snapshots old is $SNAPSHOTS_OLD.
-	SNAPSHOTS_OLD="$SNAPSHOTS_OLD  $SNAPSHOTS_OLD_DIR"
+	SNAPSHOTS_OLD="$SNAPSHOTS_OLD"$'\n'"$SNAPSHOTS_OLD_DIR"
         done
 
 	test -n "$opt_debug" && echo Debug: old snapshots are  "$SNAPSHOTS_OLD"
@@ -470,7 +470,7 @@ done
 # On Solaris %H%M expands to 12h34.
 DATE=$(date --utc +%F-%H%M)
 
-# The snapshot name after the @ symbol.
+# The snapshot name after the .snapshot path.
 SNAPNAME="$opt_prefix${opt_label:+$opt_sep$opt_label}-$DATE"
 
 # The expression for matching old snapshots.  -YYYY-MM-DD-HHMM
