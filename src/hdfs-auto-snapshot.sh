@@ -339,8 +339,8 @@ then
 fi
 
 # Ensure the path ends with a slash
-HDFS_LIST=$(hdfs lsSnapshottableDir  | cut -f 10 -d ' ' | sed 's;[^/]$;\0/;' ) \
-  || { print_log error "hdfs lsSnapshottableDir  | cut -f 10 -d ' ' | sed 's;[^/]$;\0/;' $?: $HDFS_LIST"; exit 136; }
+HDFS_LIST=$(hdfs lsSnapshottableDir  | awk '{print $10}' | sed 's;[^/]$;\0/;' ) \
+  || { print_log error "hdfs lsSnapshottableDir  | awk '{print $10}' | sed 's;[^/]$;\0/;' $?: $HDFS_LIST"; exit 136; }
 
 
 # For each Snapshottable Directory get list of snapshots. This can be large.
